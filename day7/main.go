@@ -29,16 +29,16 @@ type Hand struct {
 }
 
 var CardRank = map[rune]int{
-	'2': 0,
-	'3': 1,
-	'4': 2,
-	'5': 3,
-	'6': 4,
-	'7': 5,
-	'8': 6,
-	'9': 7,
-	'T': 8,
-	'J': 9,
+	'J': 0,
+	'2': 1,
+	'3': 2,
+	'4': 3,
+	'5': 4,
+	'6': 5,
+	'7': 6,
+	'8': 7,
+	'9': 8,
+	'T': 9,
 	'Q': 10,
 	'K': 11,
 	'A': 12,
@@ -72,7 +72,83 @@ func rankHand(hand map[rune]int) HandRank {
 	return bestRank
 }
 
-func parseHand(line string) Hand {
+func rankHandJokers(hand map[rune]int) HandRank {
+
+	bestRank := HIGH_CARD
+
+	jokerless := make(map[rune]int)
+	for k, v := range hand {
+		if k != 'J' {
+			jokerless[k] = v
+		}
+	}
+
+	for _, v := range jokerless {
+		if v == 5 {
+			bestRank = FIVE_KIND
+		} else if v == 4 && bestRank > FOUR_KIND {
+			bestRank = FOUR_KIND
+		} else if v == 2 && bestRank == PAIR {
+			bestRank = TWO_PAIR
+		} else if v == 3 && bestRank == PAIR {
+			bestRank = FULL_HOUSE
+		} else if v == 2 && bestRank == THREE_KIND {
+			bestRank = FULL_HOUSE
+		} else if v == 3 && bestRank > THREE_KIND {
+			bestRank = THREE_KIND
+		} else if v == 2 && bestRank > PAIR {
+			bestRank = PAIR
+		}
+	}
+
+	switch hand['J'] {
+	case 1:
+		switch bestRank {
+		case FIVE_KIND:
+			bestRank = FIVE_KIND
+		case FOUR_KIND:
+			bestRank = FIVE_KIND
+		case FULL_HOUSE:
+			bestRank = FOUR_KIND
+		case THREE_KIND:
+			bestRank = FOUR_KIND
+		case TWO_PAIR:
+			bestRank = FULL_HOUSE
+		case PAIR:
+			bestRank = THREE_KIND
+		case HIGH_CARD:
+			bestRank = PAIR
+		}
+	case 2:
+		switch bestRank {
+		case THREE_KIND:
+			bestRank = FIVE_KIND
+		case PAIR:
+			bestRank = FOUR_KIND
+		case HIGH_CARD:
+			bestRank = THREE_KIND
+		}
+	case 3:
+		switch bestRank {
+		case PAIR:
+			bestRank = FIVE_KIND
+		case HIGH_CARD:
+			bestRank = FOUR_KIND
+		}
+	case 4:
+		switch bestRank {
+		case HIGH_CARD:
+			bestRank = FIVE_KIND
+		}
+	case 5:
+		bestRank = FIVE_KIND
+	}
+	// fmt.Println(bestRank)
+
+	return bestRank
+}
+
+func parseHand(line string, jokers bool) Hand {
 	split := strings.Split(line, " ")
 	bid, _ := strconv.Atoi(split[1])
 
@@ -83,8 +159,12 @@ func parseHand(line string) Hand {
 		counts[c]++
 	}
 
-	rank := rankHand(counts)
-
+	var rank HandRank
+	if jokers {
+		rank = rankHandJokers(counts)
+	} else {
+		rank = rankHand(counts)
+	}
 	return Hand{bid, cards, counts, rank}
 }
 
@@ -106,7 +186,7 @@ func partOne(scanner *bufio.Scanner) {
 	fmt.Println("unsorted")
 	for scanner.Scan() {
 		line := scanner.Text()
-		hands = append(hands, parseHand(line))
+		hands = append(hands, parseHand(line, false))
 	}
 
 	slices.SortFunc(hands, orderHand)
@@ -124,6 +204,24 @@ func partOne(scanner *bufio.Scanner) {
 
 func partTwo(scanner *bufio.Scanner) {
 
+	hands := make([]Hand, 0, 100)
+
+	fmt.Println("unsorted")
+	for scanner.Scan() {
+		line := scanner.Text()
+		hands = append(hands, parseHand(line, true))
+	}
+
+	slices.SortFunc(hands, orderHand)
+
+	fmt.Println("sorted")
+	sum := 0
+	for idx, hand := range hands {
+		fmt.Println(string(hand.cards), hand.rank, idx+1, hand.bid, sum, "\t", hand.counts)
+		sum += hand.bid * (idx + 1)
+	}
+
+	fmt.Println("sum", sum)
 }
 
 func main() {
@@ -137,7 +235,7 @@ func main() {
 	scanner := bufio.NewScanner(infile)
 	scanner.Split(bufio.ScanLines)
 
-	doOne := true
+	doOne := false
 
 	if doOne {
 		partOne(scanner)
